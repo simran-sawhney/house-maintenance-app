@@ -3,6 +3,7 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { signUpWithKey } from "@/actions/auth";
 import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/primitives";
 
@@ -14,6 +15,7 @@ export function AuthForm() {
   const [email, setEmail] = React.useState("");
   const [password, setPassword] = React.useState("");
   const [displayName, setDisplayName] = React.useState("");
+  const [signupKey, setSignupKey] = React.useState("");
   const [pending, setPending] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [info, setInfo] = React.useState<string | null>(null);
@@ -27,19 +29,23 @@ export function AuthForm() {
 
     try {
       if (mode === "signup") {
-        const { data, error } = await supabase.auth.signUp({
+        // Gated server-side by SIGNUP_KEY (if configured).
+        const res = await signUpWithKey({
           email,
           password,
-          options: {
-            data: displayName ? { display_name: displayName } : undefined,
-          },
+          displayName,
+          key: signupKey,
         });
-        if (error) throw error;
-        if (!data.session) {
+        if (res.status === "error") {
+          setError(res.message);
+          return;
+        }
+        if (res.status === "confirm") {
           setInfo("Check your email to confirm your account, then sign in.");
           setMode("signin");
           return;
         }
+        // status === "ok": session cookie is set by the server action.
       } else {
         const { error } = await supabase.auth.signInWithPassword({
           email,
@@ -62,16 +68,31 @@ export function AuthForm() {
   return (
     <form onSubmit={onSubmit} className="space-y-4">
       {mode === "signup" && (
-        <div>
-          <Label htmlFor="name">Your name</Label>
-          <Input
-            id="name"
-            autoComplete="name"
-            placeholder="e.g. Simran"
-            value={displayName}
-            onChange={(e) => setDisplayName(e.target.value)}
-          />
-        </div>
+        <>
+          <div>
+            <Label htmlFor="name">Your name</Label>
+            <Input
+              id="name"
+              autoComplete="name"
+              placeholder="e.g. Simran"
+              value={displayName}
+              onChange={(e) => setDisplayName(e.target.value)}
+            />
+          </div>
+          <div>
+            <Label htmlFor="signupKey">Signup key</Label>
+            <Input
+              id="signupKey"
+              autoComplete="off"
+              placeholder="From your household admin"
+              value={signupKey}
+              onChange={(e) => setSignupKey(e.target.value)}
+            />
+            <p className="mt-1 text-xs text-muted">
+              Only needed if your household uses a signup key.
+            </p>
+          </div>
+        </>
       )}
       <div>
         <Label htmlFor="email">Email</Label>

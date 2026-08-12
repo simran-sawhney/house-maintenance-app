@@ -15,8 +15,12 @@ Supabase free tiers.
 ## What's inside
 
 - **Quick Add** (`+`) — Buy / Task / Note in 2–5 seconds. Autofocus, store
-  chips, product autocomplete, batch paste (one item per line), duplicate
-  detection.
+  chips, batch paste (one item per line), duplicate detection, and type-ahead
+  suggestions from your own history **plus a built-in grocery catalogue**
+  (`src/lib/grocery/catalog.ts`) so suggestions work from day one — edit that
+  file to tune the list; no database or deploy of data needed.
+- **History** — reachable from the two cards on the Home screen, or the clock
+  icon on Buy / Tasks. Purchases and completed tasks, each with dates.
 - **Buy** — one shared list grouped by store, urgent first. Tap to purchase
   (saved to history), optional price sheet, Undo. Distraction-free **Shopping
   mode**.
@@ -50,7 +54,19 @@ Open http://localhost:3000.
 | --- | --- | --- |
 | `NEXT_PUBLIC_SUPABASE_URL` | ✅ | Supabase → Project Settings → API |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | ✅ | The public anon key |
+| `SIGNUP_KEY` | ❌ | Set to lock sign-ups behind a shared key (see below). |
 | `SUPABASE_SERVICE_ROLE_KEY` | ❌ | Not needed. Never expose to the browser. |
+
+### Locking sign-ups (invite key)
+
+Set `SIGNUP_KEY` (e.g. in Vercel → Project → Settings → Environment Variables)
+to any secret value and share it with your family. On the **Create account**
+form they enter this key; sign-up is rejected server-side without it. Leave
+`SIGNUP_KEY` unset to allow open sign-up. The key is validated server-side and
+never sent to the browser.
+
+> For belt-and-braces enforcement you can also turn off "Allow new users to
+> sign up" in Supabase → Authentication and add members via the SQL step below.
 
 Onboarding creates the household, membership and default stores/categories
 entirely under the signed-in user's session (RLS-safe), so **no service role

@@ -16,7 +16,7 @@ export default function LoginPage() {
             />
           </svg>
         </div>
-        <h1 className="text-2xl font-semibold tracking-tight">Our Home</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">Sawhney's</h1>
         <p className="mt-1 text-muted text-[15px]">
           Your family&rsquo;s shared household command centre.
         </p>

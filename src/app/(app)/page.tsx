@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Search, AlertCircle, ChevronRight, ShoppingCart, CheckSquare, Settings } from "lucide-react";
+import { Search, AlertCircle, ChevronRight, ShoppingCart, CheckSquare, Settings, History } from "lucide-react";
 import { requireHousehold } from "@/lib/auth/household";
 import { createClient } from "@/lib/supabase/server";
 import { getDashboard } from "@/lib/data/dashboard";
@@ -112,6 +112,24 @@ export default async function HomePage() {
             </p>
           </Card>
         </Link>
+
+        {/* History */}
+        <div className="grid grid-cols-2 gap-3">
+          <Link href="/history?tab=shopping" className="block">
+            <Card className="p-4 h-full">
+              <History className="h-5 w-5 text-muted mb-2" />
+              <div className="font-semibold text-[15px]">Shopping history</div>
+              <div className="text-xs text-muted">Purchases &amp; prices</div>
+            </Card>
+          </Link>
+          <Link href="/history?tab=tasks" className="block">
+            <Card className="p-4 h-full">
+              <History className="h-5 w-5 text-muted mb-2" />
+              <div className="font-semibold text-[15px]">Task history</div>
+              <div className="text-xs text-muted">Completed jobs</div>
+            </Card>
+          </Link>
+        </div>
 
         <Suggestions
           initial={dash.suggestions.map((s) => ({
