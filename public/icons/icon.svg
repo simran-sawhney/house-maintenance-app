@@ -1,0 +1,6 @@
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Our Home">
+  <rect width="512" height="512" rx="112" fill="#2c2822"/>
+  <path d="M256 116 L404 236 V396 a16 16 0 0 1 -16 16 H300 V300 a12 12 0 0 0 -12 -12 H224 a12 12 0 0 0 -12 12 V412 H124 a16 16 0 0 1 -16 -16 V236 Z" fill="#f6f5f2"/>
+  <path d="M256 104 L420 236" stroke="#e0a458" stroke-width="26" stroke-linecap="round" fill="none"/>
+  <path d="M256 104 L92 236" stroke="#e0a458" stroke-width="26" stroke-linecap="round" fill="none"/>
+</svg>

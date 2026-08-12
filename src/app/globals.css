@@ -1,26 +1,118 @@
 @import "tailwindcss";
 
+/*
+  Our Home — warm, premium, minimal design language.
+  Light palette lives on :root; dark mode swaps the same token roles.
+*/
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --background: #f6f5f2;
+  --surface: #ffffff;
+  --surface-2: #fbfaf8;
+  --foreground: #201d19;
+  --muted: #726c63;
+  --muted-2: #9a938a;
+  --border: #e7e3db;
+  --border-strong: #d9d4ca;
+  --primary: #2c2822;
+  --primary-foreground: #faf9f6;
+  --accent: #b45309;        /* warm amber for gentle highlights */
+  --accent-soft: #fdf3e7;
+  --urgent: #c2410c;         /* burnt orange-red, noticeable not obnoxious */
+  --urgent-soft: #fbeae1;
+  --success: #3f7d5c;
+  --success-soft: #e9f2ec;
+  --ring: #b8b1a5;
+  --radius: 1rem;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --background: #17150f;
+    --surface: #201d16;
+    --surface-2: #262218;
+    --foreground: #f0ece3;
+    --muted: #a49d90;
+    --muted-2: #7c766a;
+    --border: #322d23;
+    --border-strong: #423c2f;
+    --primary: #f0ece3;
+    --primary-foreground: #201d16;
+    --accent: #e0a458;
+    --accent-soft: #2d2416;
+    --urgent: #f0855a;
+    --urgent-soft: #331d12;
+    --success: #7fb894;
+    --success-soft: #1a2a20;
+    --ring: #5a5344;
   }
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-muted-2: var(--muted-2);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-urgent: var(--urgent);
+  --color-urgent-soft: var(--urgent-soft);
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-ring: var(--ring);
+  --radius-xl: var(--radius);
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+}
+
+* {
+  border-color: var(--border);
+}
+
+html {
+  -webkit-tap-highlight-color: transparent;
+  -webkit-text-size-adjust: 100%;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans);
+  overscroll-behavior-y: none;
+}
+
+/* Respect iOS safe areas for the bottom nav and sheets */
+.pb-safe {
+  padding-bottom: calc(env(safe-area-inset-bottom) + 0.5rem);
+}
+.h-safe-nav {
+  height: calc(4.25rem + env(safe-area-inset-bottom));
+}
+
+/* Hide scrollbars on horizontal chip rows while keeping scroll */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+@keyframes sheet-up {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.animate-sheet-up { animation: sheet-up 0.22s cubic-bezier(0.22, 1, 0.36, 1); }
+.animate-fade-in { animation: fade-in 0.15s ease-out; }
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-sheet-up, .animate-fade-in { animation: none; }
 }

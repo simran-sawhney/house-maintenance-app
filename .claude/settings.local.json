@@ -2,7 +2,16 @@
   "permissions": {
     "allow": [
       "Bash(npm --version)",
-      "Bash(npx --yes create-next-app@latest . --typescript --tailwind --app --eslint --src-dir=false --import-alias \"@/*\" --use-npm --no-turbopack --yes)"
+      "Bash(npx --yes create-next-app@latest . --typescript --tailwind --app --eslint --src-dir=false --import-alias \"@/*\" --use-npm --no-turbopack --yes)",
+      "Bash(npm install *)",
+      "Bash(node scripts/gen-icons.mjs)",
+      "Bash(npx tsc *)",
+      "Bash(npx next *)",
+      "Bash(npm run *)",
+      "Bash(grep -vE \"^/Users/.*\\(tsx|ts\\)$\")",
+      "Bash(NEXT_PUBLIC_SUPABASE_URL=https://placeholder.supabase.co NEXT_PUBLIC_SUPABASE_ANON_KEY=placeholder npm run build)",
+      "Bash(npm test *)",
+      "Bash(git mv *)"
     ]
   }
 }

@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Offline · Our Home</title>
+    <style>
+      :root { color-scheme: light dark; }
+      body {
+        margin: 0;
+        min-height: 100dvh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-family: system-ui, -apple-system, sans-serif;
+        background: #f6f5f2;
+        color: #201d19;
+      }
+      @media (prefers-color-scheme: dark) {
+        body { background: #17150f; color: #f0ece3; }
+      }
+      .card { text-align: center; padding: 2rem; max-width: 20rem; }
+      h1 { font-size: 1.25rem; margin: 0 0 0.5rem; }
+      p { color: #726c63; margin: 0 0 1.5rem; font-size: 0.95rem; }
+      button {
+        border: 0;
+        background: #2c2822;
+        color: #faf9f6;
+        height: 2.75rem;
+        padding: 0 1.25rem;
+        border-radius: 0.75rem;
+        font-size: 1rem;
+        font-weight: 500;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <h1>You're offline</h1>
+      <p>Our Home needs a connection right now. Check your network and try again.</p>
+      <button onclick="location.reload()">Retry</button>
+    </div>
+  </body>
+</html>
