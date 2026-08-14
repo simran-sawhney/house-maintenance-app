@@ -1,7 +1,7 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { ShoppingItem } from "@/types/db";
-import { SHOPPING_BUCKET } from "@/lib/upload-image";
+import { SHOPPING_BUCKET } from "@/lib/storage";
 
 /**
  * Resolve display image URLs for shopping items (spec §21 precedence:

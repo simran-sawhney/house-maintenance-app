@@ -8,7 +8,7 @@ import {
   cleanSearchTerm,
   type DateRangeKey,
 } from "@/lib/history-range";
-import { SHOPPING_BUCKET } from "@/lib/upload-image";
+import { SHOPPING_BUCKET } from "@/lib/storage";
 
 const PAGE_SIZE = 40;
 

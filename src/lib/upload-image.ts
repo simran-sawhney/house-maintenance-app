@@ -1,8 +1,7 @@
 "use client";
 
 import { createClient } from "@/lib/supabase/client";
-
-export const SHOPPING_BUCKET = "shopping-images";
+import { SHOPPING_BUCKET } from "@/lib/storage";
 
 /**
  * Downscale + compress an image in the browser before upload (spec §24).
