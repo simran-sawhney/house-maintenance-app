@@ -12,9 +12,12 @@ export type QuickAddPreset = {
   storeId?: string | null;
   batch?: boolean;
   prefillName?: string;
+  /** Prefill a task due date (YYYY-MM-DD), e.g. from the calendar. */
+  dueDate?: string | null;
 };
 
 type QuickAddData = {
+  householdId: string;
   stores: Store[];
   categories: TaskCategory[];
   members: MemberOption[];

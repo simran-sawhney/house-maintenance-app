@@ -23,6 +23,7 @@ export type CreateItemInput = {
   unit?: string | null;
   notes?: string | null;
   urgent?: boolean;
+  imagePath?: string | null;
   allowDuplicate?: boolean;
 };
 
@@ -83,12 +84,22 @@ export async function createShoppingItem(
         unit: input.unit ?? null,
         notes: input.notes?.trim() || null,
         urgent: input.urgent ?? false,
+        image_path: input.imagePath ?? null,
         added_by: user.id,
       })
       .select("*")
       .single();
 
     if (error) return { status: "error", message: "Couldn't save this item. Try again." };
+
+    // Promote a new image to the reusable product when it has none (spec §20).
+    if (input.imagePath && product && !product.image_path) {
+      await supabase
+        .from("products")
+        .update({ image_path: input.imagePath })
+        .eq("id", product.id)
+        .eq("household_id", household.id);
+    }
 
     await logActivity(supabase, {
       householdId: household.id,
@@ -340,7 +351,7 @@ export async function completeShoppingItem(
       purchaseId = existing?.id as string | undefined;
     }
 
-    // Update product stats.
+    // Update product stats (+ promote the item's image if the product has none).
     if (product) {
       await supabase
         .from("products")
@@ -348,6 +359,9 @@ export async function completeShoppingItem(
           purchase_count: (product.purchase_count ?? 0) + 1,
           last_purchased_at: now,
           default_store_id: product.default_store_id ?? shopping.store_id,
+          ...(shopping.image_path && !product.image_path
+            ? { image_path: shopping.image_path }
+            : {}),
         })
         .eq("id", product.id)
         .eq("household_id", household.id);
@@ -456,6 +470,51 @@ export async function undoShoppingPurchase(
     return { ok: true };
   } catch {
     return { ok: false, message: "Couldn't undo. Try again." };
+  }
+}
+
+/** Set or clear a shopping item's image (spec §21). Promotes to product default. */
+export async function setShoppingItemImage(
+  id: string,
+  imagePath: string | null,
+): Promise<SimpleResult> {
+  try {
+    const { household } = await requireHousehold();
+    const supabase = await createClient();
+    const { data: item } = await supabase
+      .from("shopping_items")
+      .select("id, product_id")
+      .eq("id", id)
+      .eq("household_id", household.id)
+      .maybeSingle();
+    if (!item) return { ok: false, message: "Item not found." };
+
+    const { error } = await supabase
+      .from("shopping_items")
+      .update({ image_path: imagePath })
+      .eq("id", id)
+      .eq("household_id", household.id);
+    if (error) return { ok: false, message: "Couldn't save the photo." };
+
+    if (imagePath && item.product_id) {
+      const { data: product } = await supabase
+        .from("products")
+        .select("id, image_path")
+        .eq("id", item.product_id)
+        .maybeSingle();
+      if (product && !product.image_path) {
+        await supabase
+          .from("products")
+          .update({ image_path: imagePath })
+          .eq("id", product.id)
+          .eq("household_id", household.id);
+      }
+    }
+
+    revalidateShopping();
+    return { ok: true };
+  } catch {
+    return { ok: false, message: "Couldn't save the photo." };
   }
 }
 

@@ -24,6 +24,7 @@ const item = (over: Partial<ShoppingItem>): ShoppingItem => ({
   notes: null,
   urgent: false,
   status: "active",
+  image_path: null,
   added_by: null,
   created_at: "2026-08-01T00:00:00Z",
   completed_at: null,

@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input, Textarea, Label, Chip } from "@/components/ui/primitives";
 import { useToast } from "@/components/ui/toast";
 import { ItemNameInput } from "@/components/shopping/item-name-input";
+import { ImagePicker } from "@/components/shopping/image-picker";
 import {
   useQuickAdd,
   type QuickAddKind,
@@ -18,8 +19,11 @@ import {
 } from "@/actions/shopping";
 import { createTask } from "@/actions/tasks";
 import { createNote } from "@/actions/notes";
-import { RECURRENCE_PRESETS } from "@/lib/recurrence/recurrence";
-import { HOUSE_AREAS, type RecurrenceRule } from "@/types/db";
+import {
+  TaskScheduleFields,
+  type ScheduleValue,
+} from "@/components/tasks/task-schedule-fields";
+import { HOUSE_AREAS } from "@/types/db";
 import { cn } from "@/lib/utils";
 
 const KINDS: { key: QuickAddKind; label: string; icon: React.ReactNode }[] = [
@@ -75,7 +79,7 @@ function QuickAddBody({ onClose }: { onClose: () => void }) {
 /* ------------------------------- Buy ---------------------------------- */
 
 function BuyForm({ onDone }: { onDone: () => void }) {
-  const { stores, preset } = useQuickAdd();
+  const { stores, preset, householdId } = useQuickAdd();
   const { toast } = useToast();
   const router = useRouter();
 
@@ -88,6 +92,7 @@ function BuyForm({ onDone }: { onDone: () => void }) {
   const [unit, setUnit] = React.useState("");
   const [notes, setNotes] = React.useState("");
   const [urgent, setUrgent] = React.useState(false);
+  const [imagePath, setImagePath] = React.useState<string | null>(null);
   const [showMore, setShowMore] = React.useState(false);
   const [pending, setPending] = React.useState(false);
   const [batchText, setBatchText] = React.useState("");
@@ -111,6 +116,7 @@ function BuyForm({ onDone }: { onDone: () => void }) {
       unit: unit || null,
       notes: notes || null,
       urgent,
+      imagePath,
       allowDuplicate,
     });
     setPending(false);
@@ -244,6 +250,14 @@ function BuyForm({ onDone }: { onDone: () => void }) {
                   placeholder="Any details"
                 />
               </div>
+              <div>
+                <Label>Photo (optional)</Label>
+                <ImagePicker
+                  householdId={householdId}
+                  value={imagePath}
+                  onChange={setImagePath}
+                />
+              </div>
             </div>
           )}
 
@@ -298,16 +312,19 @@ function BuyForm({ onDone }: { onDone: () => void }) {
 /* ------------------------------- Task --------------------------------- */
 
 function TaskForm({ onDone }: { onDone: () => void }) {
-  const { categories, members } = useQuickAdd();
+  const { categories, members, preset } = useQuickAdd();
   const { toast } = useToast();
   const router = useRouter();
 
   const [title, setTitle] = React.useState("");
   const [categoryId, setCategoryId] = React.useState<string | null>(null);
   const [urgent, setUrgent] = React.useState(false);
-  const [due, setDue] = React.useState("");
+  const [schedule, setSchedule] = React.useState<ScheduleValue>({
+    dueDate: preset?.dueDate ?? null,
+    recurrence: null,
+    recurrenceEndDate: null,
+  });
   const [assignedTo, setAssignedTo] = React.useState<string | null>(null);
-  const [recurrenceKey, setRecurrenceKey] = React.useState("none");
   const [notes, setNotes] = React.useState("");
   const [showMore, setShowMore] = React.useState(false);
   const [pending, setPending] = React.useState(false);
@@ -315,15 +332,14 @@ function TaskForm({ onDone }: { onDone: () => void }) {
   async function submit() {
     if (!title.trim()) return;
     setPending(true);
-    const rule: RecurrenceRule | null =
-      RECURRENCE_PRESETS.find((p) => p.key === recurrenceKey)?.rule ?? null;
     const res = await createTask({
       title,
       categoryId,
       urgent,
-      dueDate: due ? new Date(due).toISOString() : null,
+      dueDate: schedule.dueDate,
       assignedTo,
-      recurrence: rule,
+      recurrence: schedule.recurrence,
+      recurrenceEndDate: schedule.recurrenceEndDate,
       notes: notes || null,
     });
     setPending(false);
@@ -352,27 +368,17 @@ function TaskForm({ onDone }: { onDone: () => void }) {
           <Chip
             key={c.id}
             active={categoryId === c.id}
-            onClick={() =>
-              setCategoryId(categoryId === c.id ? null : c.id)
-            }
+            onClick={() => setCategoryId(categoryId === c.id ? null : c.id)}
           >
             {c.icon} {c.name}
           </Chip>
         ))}
       </ChipRow>
 
+      <TaskScheduleFields value={schedule} onChange={setSchedule} />
+
       {showMore && (
         <div className="space-y-4">
-          <div>
-            <Label htmlFor="due">Due date</Label>
-            <Input
-              id="due"
-              type="date"
-              value={due}
-              onChange={(e) => setDue(e.target.value)}
-            />
-          </div>
-
           {members.length > 0 && (
             <ChipRow label="Assign to">
               {members.map((m) => (
@@ -388,18 +394,6 @@ function TaskForm({ onDone }: { onDone: () => void }) {
               ))}
             </ChipRow>
           )}
-
-          <ChipRow label="Repeat">
-            {RECURRENCE_PRESETS.map((p) => (
-              <Chip
-                key={p.key}
-                active={recurrenceKey === p.key}
-                onClick={() => setRecurrenceKey(p.key)}
-              >
-                {p.label}
-              </Chip>
-            ))}
-          </ChipRow>
 
           <div>
             <Label htmlFor="tnotes">Notes</Label>

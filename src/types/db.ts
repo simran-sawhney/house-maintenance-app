@@ -17,11 +17,19 @@ export type ActivityType =
   | "maintenance_updated"
   | "note_added";
 
-/** Simple recurrence representation (build spec §31 — no raw RRULE in UI). */
+export type TaskOccurrenceStatus = "completed" | "skipped";
+
+/**
+ * Simple recurrence representation (no raw RRULE in UI). `days_of_week` uses
+ * 0=Sun..6=Sat and only applies to weekly recurrence.
+ *   { frequency: "weekly", interval: 1, days_of_week: [6] } -> every Saturday
+ *   { frequency: "daily",  interval: 7 }                    -> every 7 days
+ *   { frequency: "monthly", interval: 3 }                   -> every 3 months
+ */
 export type RecurrenceRule = {
-  freq: "daily" | "weekly" | "monthly";
+  frequency: "daily" | "weekly" | "monthly";
   interval: number; // every N units
-  weekday?: number | null; // 0=Sun..6=Sat, for "every Saturday" style
+  days_of_week?: number[]; // weekly only; 0=Sun..6=Sat
 };
 
 export interface Household {
@@ -67,6 +75,7 @@ export interface Product {
   category: string | null;
   last_purchased_at: string | null;
   purchase_count: number;
+  image_path: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -83,6 +92,7 @@ export interface ShoppingItem {
   notes: string | null;
   urgent: boolean;
   status: ShoppingStatus;
+  image_path: string | null;
   added_by: string | null;
   created_at: string;
   completed_at: string | null;
@@ -122,12 +132,27 @@ export interface Task {
   assigned_to: string | null;
   status: TaskStatus;
   due_date: string | null;
+  all_day: boolean;
   recurrence_rule: RecurrenceRule | null;
+  recurrence_end_date: string | null;
   created_by: string | null;
   created_at: string;
   completed_at: string | null;
   completed_by: string | null;
   parent_task_id: string | null;
+}
+
+export interface TaskOccurrence {
+  id: string;
+  household_id: string;
+  task_id: string;
+  occurrence_date: string; // YYYY-MM-DD
+  scheduled_time: string | null;
+  status: TaskOccurrenceStatus;
+  completed_at: string | null;
+  completed_by: string | null;
+  rescheduled_from: string | null;
+  created_at: string;
 }
 
 export interface MaintenanceItem {

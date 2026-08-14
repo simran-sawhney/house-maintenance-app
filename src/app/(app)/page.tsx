@@ -3,11 +3,12 @@ import { Search, AlertCircle, ChevronRight, ShoppingCart, CheckSquare, Settings,
 import { requireHousehold } from "@/lib/auth/household";
 import { createClient } from "@/lib/supabase/server";
 import { getDashboard } from "@/lib/data/dashboard";
+import { getOpenTaskViews } from "@/lib/data/tasks-view";
 import { Card, SectionTitle } from "@/components/ui/primitives";
 import { Greeting } from "@/components/dashboard/greeting";
 import { QuickActions } from "@/components/dashboard/quick-actions";
 import { Suggestions } from "@/components/dashboard/suggestions";
-import { formatRelative } from "@/lib/dates";
+import { formatRelative, formatDateStrFriendly, todayStr } from "@/lib/dates";
 import type { Store } from "@/types/db";
 
 export default async function HomePage() {
@@ -25,6 +26,21 @@ export default async function HomePage() {
   const dash = await getDashboard(supabase, household.id, stores);
   const hasUrgent =
     dash.urgentShopping.length > 0 || dash.urgentTasks.length > 0;
+
+  // Today / Upcoming task glance (spec §16).
+  const today = todayStr(household.timezone);
+  const taskViews = await getOpenTaskViews(
+    supabase,
+    household.id,
+    household.timezone,
+  );
+  const todayTasks = taskViews.filter(
+    (v) => v.dateStr && v.dateStr <= today,
+  );
+  const upcomingTasks = taskViews
+    .filter((v) => v.dateStr && v.dateStr > today)
+    .sort((a, b) => (a.dateStr! < b.dateStr! ? -1 : 1))
+    .slice(0, 4);
 
   return (
     <div className="pb-4">
@@ -112,6 +128,51 @@ export default async function HomePage() {
             </p>
           </Card>
         </Link>
+
+        {/* Today / Upcoming tasks */}
+        {(todayTasks.length > 0 || upcomingTasks.length > 0) && (
+          <div className="grid grid-cols-1 gap-4">
+            {todayTasks.length > 0 && (
+              <section className="space-y-2">
+                <SectionTitle>Today</SectionTitle>
+                <Card className="divide-y divide-border overflow-hidden">
+                  {todayTasks.slice(0, 5).map((v) => (
+                    <div
+                      key={v.task.id}
+                      className="flex items-center gap-2 px-4 py-2.5"
+                    >
+                      <CheckSquare className="h-4 w-4 text-muted shrink-0" />
+                      <span className="text-[15px] truncate">{v.task.title}</span>
+                      {v.overdue && (
+                        <span className="ml-auto text-[11px] text-urgent shrink-0">
+                          Overdue
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                </Card>
+              </section>
+            )}
+            {upcomingTasks.length > 0 && (
+              <section className="space-y-2">
+                <SectionTitle>Upcoming</SectionTitle>
+                <Card className="divide-y divide-border overflow-hidden">
+                  {upcomingTasks.map((v) => (
+                    <div
+                      key={v.task.id}
+                      className="flex items-center gap-2 px-4 py-2.5"
+                    >
+                      <span className="text-xs text-muted-2 w-14 shrink-0">
+                        {formatDateStrFriendly(v.dateStr!, household.timezone)}
+                      </span>
+                      <span className="text-[15px] truncate">{v.task.title}</span>
+                    </div>
+                  ))}
+                </Card>
+              </section>
+            )}
+          </div>
+        )}
 
         {/* History */}
         <div className="grid grid-cols-2 gap-3">

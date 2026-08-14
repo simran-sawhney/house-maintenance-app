@@ -8,7 +8,13 @@ import { Button } from "@/components/ui/button";
 import { Input, Textarea, Label } from "@/components/ui/primitives";
 import { useToast } from "@/components/ui/toast";
 import { StoreChips } from "@/components/quick-add/quick-add-sheet";
-import { updateShoppingItem, cancelShoppingItem } from "@/actions/shopping";
+import { ImagePicker } from "@/components/shopping/image-picker";
+import { useQuickAdd } from "@/components/quick-add/quick-add-context";
+import {
+  updateShoppingItem,
+  cancelShoppingItem,
+  setShoppingItemImage,
+} from "@/actions/shopping";
 import type { ShoppingItem, Store } from "@/types/db";
 import { cn } from "@/lib/utils";
 
@@ -18,6 +24,7 @@ export function EditItemSheet({
   onClose,
   item,
   stores,
+  imageUrl = null,
   onChanged,
   onRemoved,
 }: {
@@ -25,11 +32,16 @@ export function EditItemSheet({
   onClose: () => void;
   item: ShoppingItem | null;
   stores: Store[];
+  imageUrl?: string | null;
   onChanged: (patch: Partial<ShoppingItem>) => void;
   onRemoved: () => void;
 }) {
   const { toast } = useToast();
+  const { householdId } = useQuickAdd();
   const router = useRouter();
+  const [imagePath, setImagePath] = React.useState<string | null>(
+    item?.image_path ?? null,
+  );
   // Parent renders this component keyed by item.id, so initialisers run fresh
   // for each edited item — no sync effect required.
   const [name, setName] = React.useState(item?.name ?? "");
@@ -127,6 +139,25 @@ export function EditItemSheet({
             rows={2}
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
+          />
+        </div>
+
+        <div>
+          <Label>Photo</Label>
+          <ImagePicker
+            householdId={householdId}
+            value={imagePath}
+            initialUrl={imageUrl}
+            onChange={async (path) => {
+              setImagePath(path);
+              const res = await setShoppingItemImage(item!.id, path);
+              if (!res.ok) {
+                toast({ message: res.message ?? "Couldn't save the photo." });
+                return;
+              }
+              onChanged({ image_path: path });
+              router.refresh();
+            }}
           />
         </div>
         <button

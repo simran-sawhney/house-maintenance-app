@@ -1,50 +1,6 @@
 import type { RecurrenceRule } from "@/types/db";
 
-/**
- * Compute the next occurrence after `from` for a recurrence rule (build spec
- * §31). Pure and timezone-agnostic — it shifts the calendar date and preserves
- * the time-of-day of `from`. No raw RRULE is exposed to users.
- */
-export function nextOccurrence(rule: RecurrenceRule, from: Date): Date {
-  const interval = Math.max(1, Math.floor(rule.interval || 1));
-  const d = new Date(from.getTime());
-
-  switch (rule.freq) {
-    case "daily": {
-      d.setDate(d.getDate() + interval);
-      return d;
-    }
-    case "weekly": {
-      if (rule.weekday != null) {
-        // Next matching weekday strictly after `from`, then add extra weeks.
-        const target = ((rule.weekday % 7) + 7) % 7;
-        do {
-          d.setDate(d.getDate() + 1);
-        } while (d.getDay() !== target);
-        if (interval > 1) d.setDate(d.getDate() + (interval - 1) * 7);
-        return d;
-      }
-      d.setDate(d.getDate() + interval * 7);
-      return d;
-    }
-    case "monthly": {
-      const day = d.getDate();
-      d.setDate(1); // avoid overflow (e.g. 31 Jan -> Mar)
-      d.setMonth(d.getMonth() + interval);
-      const daysInMonth = new Date(
-        d.getFullYear(),
-        d.getMonth() + 1,
-        0,
-      ).getDate();
-      d.setDate(Math.min(day, daysInMonth));
-      return d;
-    }
-    default:
-      return d;
-  }
-}
-
-const WEEKDAYS = [
+export const WEEKDAYS = [
   "Sunday",
   "Monday",
   "Tuesday",
@@ -53,45 +9,137 @@ const WEEKDAYS = [
   "Friday",
   "Saturday",
 ];
+export const WEEKDAYS_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
-/** Human-friendly label, e.g. "Every 2 weeks", "Every Saturday". */
-export function recurrenceLabel(rule: RecurrenceRule | null): string {
-  if (!rule) return "";
-  const n = Math.max(1, Math.floor(rule.interval || 1));
-  if (rule.freq === "weekly" && rule.weekday != null) {
-    const day = WEEKDAYS[((rule.weekday % 7) + 7) % 7];
-    return n === 1 ? `Every ${day}` : `Every ${n} weeks on ${day}`;
+/**
+ * Tolerantly parse a stored recurrence rule, accepting both the current shape
+ * ({frequency, interval, days_of_week}) and the legacy one ({freq, interval,
+ * weekday}). Returns null for no recurrence.
+ */
+export function normalizeRule(raw: unknown): RecurrenceRule | null {
+  if (!raw || typeof raw !== "object") return null;
+  const r = raw as Record<string, unknown>;
+  const frequency = (r.frequency ?? r.freq) as
+    | "daily"
+    | "weekly"
+    | "monthly"
+    | undefined;
+  if (frequency !== "daily" && frequency !== "weekly" && frequency !== "monthly")
+    return null;
+  const interval = Math.max(1, Math.floor(Number(r.interval) || 1));
+  let days: number[] | undefined;
+  if (Array.isArray(r.days_of_week)) {
+    days = (r.days_of_week as unknown[])
+      .map((n) => Number(n))
+      .filter((n) => Number.isInteger(n) && n >= 0 && n <= 6);
+  } else if (r.weekday != null) {
+    days = [Number(r.weekday)];
   }
-  const unit = { daily: "day", weekly: "week", monthly: "month" }[rule.freq];
-  return n === 1 ? `Every ${unit}` : `Every ${n} ${unit}s`;
+  return {
+    frequency,
+    interval,
+    ...(frequency === "weekly" && days && days.length > 0
+      ? { days_of_week: days }
+      : {}),
+  };
 }
 
-/** Preset options offered in Quick Add (build spec §32). */
-export const RECURRENCE_PRESETS: {
-  key: string;
-  label: string;
-  rule: RecurrenceRule | null;
-}[] = [
-  { key: "none", label: "One-off", rule: null },
-  { key: "daily", label: "Daily", rule: { freq: "daily", interval: 1 } },
-  { key: "weekly", label: "Weekly", rule: { freq: "weekly", interval: 1 } },
-  {
-    key: "fortnightly",
-    label: "Every 2 weeks",
-    rule: { freq: "weekly", interval: 2 },
-  },
-  { key: "monthly", label: "Monthly", rule: { freq: "monthly", interval: 1 } },
+/** Human-friendly label, e.g. "Every Saturday", "Every 2 weeks", "Every 3 months". */
+export function recurrenceLabel(rule: RecurrenceRule | null): string {
+  const r = normalizeRule(rule);
+  if (!r) return "";
+  const n = r.interval;
+
+  if (r.frequency === "weekly") {
+    const days = r.days_of_week ?? [];
+    if (days.length > 0) {
+      const names = [...days]
+        .sort((a, b) => a - b)
+        .map((d) => (days.length === 1 ? WEEKDAYS[d] : WEEKDAYS_SHORT[d]));
+      const list = names.join(", ");
+      if (n === 1) return `Every ${list}`;
+      return `Every ${n} weeks on ${list}`;
+    }
+    return n === 1 ? "Every week" : `Every ${n} weeks`;
+  }
+  if (r.frequency === "daily") {
+    return n === 1 ? "Every day" : `Every ${n} days`;
+  }
+  return n === 1 ? "Every month" : `Every ${n} months`;
+}
+
+/** Short chip-friendly summary, e.g. "Weekly", "Every 2 wks". */
+export function recurrenceShort(rule: RecurrenceRule | null): string {
+  const r = normalizeRule(rule);
+  if (!r) return "";
+  const n = r.interval;
+  if (r.frequency === "daily") return n === 1 ? "Daily" : `Every ${n} days`;
+  if (r.frequency === "monthly")
+    return n === 1 ? "Monthly" : `Every ${n} mo`;
+  const days = r.days_of_week ?? [];
+  if (days.length > 0 && n === 1) {
+    if (days.length === 1) return WEEKDAYS_SHORT[days[0]];
+    return days
+      .slice()
+      .sort((a, b) => a - b)
+      .map((d) => WEEKDAYS_SHORT[d][0])
+      .join("");
+  }
+  return n === 1 ? "Weekly" : `Every ${n} wks`;
+}
+
+export type PresetKey =
+  | "none"
+  | "daily"
+  | "weekly"
+  | "fortnightly"
+  | "monthly"
+  | "custom";
+
+/** Quick Add recurrence presets. `custom` is handled with extra controls. */
+export const RECURRENCE_PRESETS: { key: PresetKey; label: string }[] = [
+  { key: "none", label: "One-off" },
+  { key: "daily", label: "Daily" },
+  { key: "weekly", label: "Weekly" },
+  { key: "fortnightly", label: "Every 2 weeks" },
+  { key: "monthly", label: "Monthly" },
+  { key: "custom", label: "Custom" },
 ];
 
+/** Build a rule for a preset (weekly presets take optional weekday set). */
+export function ruleForPreset(
+  key: PresetKey,
+  daysOfWeek?: number[],
+): RecurrenceRule | null {
+  const weekly = (interval: number): RecurrenceRule => ({
+    frequency: "weekly",
+    interval,
+    ...(daysOfWeek && daysOfWeek.length > 0 ? { days_of_week: daysOfWeek } : {}),
+  });
+  switch (key) {
+    case "daily":
+      return { frequency: "daily", interval: 1 };
+    case "weekly":
+      return weekly(1);
+    case "fortnightly":
+      return weekly(2);
+    case "monthly":
+      return { frequency: "monthly", interval: 1 };
+    case "none":
+    case "custom":
+    default:
+      return null;
+  }
+}
+
 /** Match a stored rule back to a preset key for UI selection. */
-export function presetKeyForRule(rule: RecurrenceRule | null): string {
-  if (!rule) return "none";
-  const found = RECURRENCE_PRESETS.find(
-    (p) =>
-      p.rule &&
-      p.rule.freq === rule.freq &&
-      p.rule.interval === rule.interval &&
-      (p.rule.weekday ?? null) === (rule.weekday ?? null),
-  );
-  return found?.key ?? "none";
+export function presetKeyForRule(rule: RecurrenceRule | null): PresetKey {
+  const r = normalizeRule(rule);
+  if (!r) return "none";
+  if (r.frequency === "daily") return r.interval === 1 ? "daily" : "custom";
+  if (r.frequency === "monthly") return r.interval === 1 ? "monthly" : "custom";
+  // weekly
+  if (r.interval === 1) return "weekly";
+  if (r.interval === 2) return "fortnightly";
+  return "custom";
 }

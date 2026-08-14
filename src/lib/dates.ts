@@ -26,6 +26,62 @@ function dayDiff(a: Date, b: Date, timeZone: string): number {
   return Math.round((ua - ub) / 86_400_000);
 }
 
+const pad = (n: number) => String(n).padStart(2, "0");
+
+/** Calendar date (YYYY-MM-DD) of an instant, in the household timezone. */
+export function toDateStr(
+  input: string | Date,
+  timeZone: string = DEFAULT_TIMEZONE,
+): string {
+  const date = typeof input === "string" ? new Date(input) : input;
+  const p = parts(date, timeZone);
+  return `${p.y}-${pad(p.m)}-${pad(p.d)}`;
+}
+
+/** Today's calendar date (YYYY-MM-DD) in the household timezone. */
+export function todayStr(timeZone: string = DEFAULT_TIMEZONE): string {
+  return toDateStr(new Date(), timeZone);
+}
+
+/**
+ * Store an all-day date as noon UTC so the calendar day is stable across
+ * timezones (avoids a task jumping to the previous/next day). (spec §30)
+ */
+export function dateStrToDueISO(dateStr: string): string {
+  return `${dateStr}T12:00:00.000Z`;
+}
+
+/** Friendly label for a YYYY-MM-DD date string relative to today. */
+export function formatDateStrFriendly(
+  dateStr: string,
+  timeZone: string = DEFAULT_TIMEZONE,
+): string {
+  const today = todayStr(timeZone);
+  const [ty, tm, td] = today.split("-").map(Number);
+  const [y, m, d] = dateStr.split("-").map(Number);
+  const diff = Math.round(
+    (Date.UTC(y, m - 1, d) - Date.UTC(ty, tm - 1, td)) / 86_400_000,
+  );
+  if (diff === 0) return "Today";
+  if (diff === -1) return "Yesterday";
+  if (diff === 1) return "Tomorrow";
+  const date = new Date(Date.UTC(y, m - 1, d, 12));
+  const sameYear = y === ty;
+  // Within the coming week, show the weekday name.
+  if (diff > 1 && diff < 7) {
+    return new Intl.DateTimeFormat("en-AU", {
+      timeZone: "UTC",
+      weekday: "long",
+    }).format(date);
+  }
+  return new Intl.DateTimeFormat("en-AU", {
+    timeZone: "UTC",
+    day: "numeric",
+    month: "short",
+    ...(sameYear ? {} : { year: "numeric" }),
+  }).format(date);
+}
+
 /** "Today", "Yesterday", "12 Aug", "12 Aug 2026". */
 export function formatFriendlyDate(
   input: string | Date | null | undefined,
