@@ -11,11 +11,13 @@ import { BottomNav } from "@/components/layout/bottom-nav";
 import type { Store, TaskCategory } from "@/types/db";
 
 export function AppChrome({
+  householdId,
   stores,
   categories,
   members,
   children,
 }: {
+  householdId: string;
   stores: Store[];
   categories: TaskCategory[];
   members: MemberOption[];
@@ -23,7 +25,7 @@ export function AppChrome({
 }) {
   return (
     <ToastProvider>
-      <QuickAddProvider data={{ stores, categories, members }}>
+      <QuickAddProvider data={{ householdId, stores, categories, members }}>
         <div className="mx-auto max-w-md w-full min-h-dvh pb-28">
           {children}
         </div>

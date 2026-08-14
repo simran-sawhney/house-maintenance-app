@@ -4,11 +4,13 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requireHousehold } from "@/lib/auth/household";
 import { logActivity } from "@/lib/activity";
-import { nextOccurrence } from "@/lib/recurrence/recurrence";
+import { normalizeRule } from "@/lib/recurrence/recurrence";
+import { dateStrToDueISO, todayStr } from "@/lib/dates";
 import type { RecurrenceRule, Task } from "@/types/db";
 
 function revalidateTasks() {
   revalidatePath("/tasks");
+  revalidatePath("/calendar");
   revalidatePath("/");
 }
 
@@ -17,9 +19,10 @@ export type CreateTaskInput = {
   categoryId?: string | null;
   notes?: string | null;
   urgent?: boolean;
-  dueDate?: string | null; // ISO or null
+  dueDate?: string | null; // YYYY-MM-DD (all-day) or null
   assignedTo?: string | null;
   recurrence?: RecurrenceRule | null;
+  recurrenceEndDate?: string | null; // YYYY-MM-DD or null
 };
 
 export type CreateTaskResult =
@@ -36,6 +39,11 @@ export async function createTask(
     const title = input.title.trim();
     if (!title) return { ok: false, message: "Please enter a task title." };
 
+    const rule = normalizeRule(input.recurrence);
+    // A recurring task needs an anchor date; default to today if unset.
+    const anchorDate =
+      input.dueDate ?? (rule ? todayStr(household.timezone) : null);
+
     const { data, error } = await supabase
       .from("tasks")
       .insert({
@@ -44,9 +52,11 @@ export async function createTask(
         category_id: input.categoryId ?? null,
         notes: input.notes?.trim() || null,
         urgent: input.urgent ?? false,
-        due_date: input.dueDate ?? null,
+        due_date: anchorDate ? dateStrToDueISO(anchorDate) : null,
+        all_day: true,
         assigned_to: input.assignedTo ?? null,
-        recurrence_rule: input.recurrence ?? null,
+        recurrence_rule: rule,
+        recurrence_end_date: input.recurrenceEndDate ?? null,
         created_by: user.id,
       })
       .select("*")
@@ -78,9 +88,10 @@ export async function updateTask(
     categoryId?: string | null;
     notes?: string | null;
     urgent?: boolean;
-    dueDate?: string | null;
+    dueDate?: string | null; // YYYY-MM-DD or null
     assignedTo?: string | null;
     recurrence?: RecurrenceRule | null;
+    recurrenceEndDate?: string | null;
   },
 ): Promise<SimpleResult> {
   try {
@@ -95,10 +106,13 @@ export async function updateTask(
     if (patch.categoryId !== undefined) update.category_id = patch.categoryId;
     if (patch.notes !== undefined) update.notes = patch.notes?.trim() || null;
     if (patch.urgent !== undefined) update.urgent = patch.urgent;
-    if (patch.dueDate !== undefined) update.due_date = patch.dueDate;
+    if (patch.dueDate !== undefined)
+      update.due_date = patch.dueDate ? dateStrToDueISO(patch.dueDate) : null;
     if (patch.assignedTo !== undefined) update.assigned_to = patch.assignedTo;
     if (patch.recurrence !== undefined)
-      update.recurrence_rule = patch.recurrence;
+      update.recurrence_rule = normalizeRule(patch.recurrence);
+    if (patch.recurrenceEndDate !== undefined)
+      update.recurrence_end_date = patch.recurrenceEndDate;
 
     const { error } = await supabase
       .from("tasks")
@@ -114,10 +128,15 @@ export async function updateTask(
 }
 
 /**
- * Complete a task (build spec §30, §31). Records completion and, for recurring
- * tasks, spawns the next occurrence — avoiding duplicate future occurrences.
+ * Complete a task or a single recurring occurrence (spec §9, §30).
+ *  - one-off task -> mark the task completed
+ *  - recurring task -> write ONE task_occurrences row; the parent stays open so
+ *    future occurrences remain scheduled.
  */
-export async function completeTask(id: string): Promise<SimpleResult> {
+export async function completeTask(
+  id: string,
+  occurrenceDate?: string | null,
+): Promise<SimpleResult> {
   try {
     const { household, user } = await requireHousehold();
     const supabase = await createClient();
@@ -130,45 +149,30 @@ export async function completeTask(id: string): Promise<SimpleResult> {
       .maybeSingle();
     if (!task) return { ok: false, message: "Task not found." };
     const t = task as Task;
-    if (t.status === "completed") return { ok: true };
 
-    const now = new Date();
-    await supabase
-      .from("tasks")
-      .update({
-        status: "completed",
-        completed_at: now.toISOString(),
-        completed_by: user.id,
-      })
-      .eq("id", id)
-      .eq("household_id", household.id);
+    const rule = normalizeRule(t.recurrence_rule);
+    const now = new Date().toISOString();
 
-    // Spawn next occurrence for recurring tasks (only if none exists yet).
-    if (t.recurrence_rule) {
-      const base = t.due_date ? new Date(t.due_date) : now;
-      const next = nextOccurrence(t.recurrence_rule, base);
-      const { data: existingNext } = await supabase
-        .from("tasks")
-        .select("id")
-        .eq("household_id", household.id)
-        .eq("parent_task_id", t.parent_task_id ?? t.id)
-        .eq("status", "open")
-        .limit(1)
-        .maybeSingle();
-      if (!existingNext) {
-        await supabase.from("tasks").insert({
+    if (rule && occurrenceDate) {
+      // Recurring: record just this occurrence.
+      await supabase.from("task_occurrences").upsert(
+        {
           household_id: household.id,
-          title: t.title,
-          category_id: t.category_id,
-          notes: t.notes,
-          urgent: t.urgent,
-          assigned_to: t.assigned_to,
-          due_date: next.toISOString(),
-          recurrence_rule: t.recurrence_rule,
-          created_by: user.id,
-          parent_task_id: t.parent_task_id ?? t.id,
-        });
-      }
+          task_id: id,
+          occurrence_date: occurrenceDate,
+          status: "completed",
+          completed_at: now,
+          completed_by: user.id,
+        },
+        { onConflict: "task_id,occurrence_date" },
+      );
+    } else {
+      if (t.status === "completed") return { ok: true };
+      await supabase
+        .from("tasks")
+        .update({ status: "completed", completed_at: now, completed_by: user.id })
+        .eq("id", id)
+        .eq("household_id", household.id);
     }
 
     await logActivity(supabase, {
@@ -177,7 +181,7 @@ export async function completeTask(id: string): Promise<SimpleResult> {
       eventType: "task_completed",
       entityType: "task",
       entityId: id,
-      metadata: { title: t.title },
+      metadata: { title: t.title, occurrence: occurrenceDate ?? null },
     });
 
     revalidateTasks();
@@ -188,36 +192,29 @@ export async function completeTask(id: string): Promise<SimpleResult> {
   }
 }
 
-/** Undo completion (build spec §30). Also removes the spawned next occurrence. */
-export async function undoTaskCompletion(id: string): Promise<SimpleResult> {
+/** Undo completion of a task or a recurring occurrence. */
+export async function undoTaskCompletion(
+  id: string,
+  occurrenceDate?: string | null,
+): Promise<SimpleResult> {
   try {
     const { household } = await requireHousehold();
     const supabase = await createClient();
 
-    const { data: task } = await supabase
-      .from("tasks")
-      .select("*")
-      .eq("id", id)
-      .eq("household_id", household.id)
-      .maybeSingle();
-    if (!task) return { ok: false, message: "Task not found." };
-    const t = task as Task;
-
-    // Remove the freshly-spawned open occurrence, if any.
-    if (t.recurrence_rule) {
+    if (occurrenceDate) {
       await supabase
-        .from("tasks")
+        .from("task_occurrences")
         .delete()
         .eq("household_id", household.id)
-        .eq("parent_task_id", t.parent_task_id ?? t.id)
-        .eq("status", "open");
+        .eq("task_id", id)
+        .eq("occurrence_date", occurrenceDate);
+    } else {
+      await supabase
+        .from("tasks")
+        .update({ status: "open", completed_at: null, completed_by: null })
+        .eq("id", id)
+        .eq("household_id", household.id);
     }
-
-    await supabase
-      .from("tasks")
-      .update({ status: "open", completed_at: null, completed_by: null })
-      .eq("id", id)
-      .eq("household_id", household.id);
 
     revalidateTasks();
     revalidatePath("/history");
@@ -227,7 +224,7 @@ export async function undoTaskCompletion(id: string): Promise<SimpleResult> {
   }
 }
 
-/** Soft-cancel a task (build spec §84). */
+/** Soft-cancel a task. For recurring, this ends the whole series. */
 export async function cancelTask(id: string): Promise<SimpleResult> {
   try {
     const { household } = await requireHousehold();

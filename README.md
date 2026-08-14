@@ -19,13 +19,30 @@ Supabase free tiers.
   suggestions from your own history **plus a built-in grocery catalogue**
   (`src/lib/grocery/catalog.ts`) so suggestions work from day one — edit that
   file to tune the list; no database or deploy of data needed.
-- **History** — reachable from the two cards on the Home screen, or the clock
-  icon on Buy / Tasks. Purchases and completed tasks, each with dates.
+- **History search** — Purchases and Completed tasks each have an instant
+  search (debounced, server-side, trigram-indexed) plus filters (store / date
+  range / person for purchases; category / person / date / one-off-vs-recurring
+  for tasks), sorting, date grouping, and "Load more" pagination. Completed
+  **recurring occurrences** are searchable individually. Reachable from the Home
+  cards or the clock icon on Buy / Tasks; search/filters are reflected in the URL.
 - **Buy** — one shared list grouped by store, urgent first. Tap to purchase
   (saved to history), optional price sheet, Undo. Distraction-free **Shopping
   mode**.
-- **Tasks** — urgent / due / other, completion with Undo, simple recurrence
-  (daily, weekly, fortnightly, monthly) that spawns the next occurrence.
+- **Tasks** — grouped like the Buy screen (by category, or due date / person /
+  none), with All / Mine / Urgent / Recurring filters. Optional due dates
+  (Today / Tomorrow / This weekend / pick), completion with Undo, and overdue
+  surfacing.
+- **Calendar** — month + agenda views of dated and recurring tasks (tasks are
+  the source of truth; the calendar is just another view). Tap a day to see or
+  add tasks; complete straight from the calendar.
+- **Recurring tasks** — daily / weekly (pick weekdays) / every 2 weeks /
+  monthly / custom "every N units". Completing one occurrence never completes
+  future ones — occurrences are computed on the fly and only completion state
+  is stored (`task_occurrences`); no years of rows are pre-generated.
+- **Shopping photos** — optional Take/Choose photo when adding an item
+  (compressed client-side, stored in a private Supabase Storage bucket).
+  Thumbnails on the Buy list, a larger preview in Shopping mode, and images
+  reused automatically for repeat purchases of the same product.
 - **House** — maintenance items per area with a status and a permanent
   timeline of logs (with optional cost). Household notes.
 - **Home dashboard** — urgent items, shopping & task summaries, "You may need
@@ -80,6 +97,11 @@ key is required**.
 2. Apply the migrations in `supabase/migrations/` **in order**:
    - `0001_init.sql` — tables, indexes, constraints, triggers
    - `0002_rls.sql` — RLS enablement, helper functions and policies
+   - `0003_profile_autocreate.sql` — auto-create a profile per user + backfill
+   - `0004_calendar_recurrence_images.sql` — task occurrences, calendar/recurrence
+     fields, product/shopping image columns
+   - `0005_storage.sql` — private `shopping-images` Storage bucket + policies
+   - `0006_history_search.sql` — trigram search indexes + `completed_task_history` view
 
    **Option A — SQL editor:** paste each file's contents and run, in order.
 
@@ -89,6 +111,9 @@ key is required**.
    supabase link --project-ref YOUR-PROJECT-REF
    supabase db push
    ```
+
+   Migration `0005` creates a **private** Storage bucket `shopping-images` with
+   household-scoped access policies — shopping photos are never public.
 
 3. **Auth:** email + password is used. For the quickest family setup, disable
    "Confirm email" under Authentication → Providers → Email (otherwise each

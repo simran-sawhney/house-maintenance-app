@@ -10,13 +10,15 @@ import { useToast } from "@/components/ui/toast";
 import { useQuickAdd } from "@/components/quick-add/quick-add-context";
 import { updateTask, cancelTask } from "@/actions/tasks";
 import {
-  RECURRENCE_PRESETS,
-  presetKeyForRule,
-} from "@/lib/recurrence/recurrence";
-import type { RecurrenceRule, Task } from "@/types/db";
+  TaskScheduleFields,
+  type ScheduleValue,
+} from "@/components/tasks/task-schedule-fields";
+import { normalizeRule } from "@/lib/recurrence/recurrence";
+import { dateStrToDueISO } from "@/lib/dates";
+import type { Task } from "@/types/db";
 import { cn } from "@/lib/utils";
 
-/** Edit an open task (build spec §64 applied to tasks). Rendered keyed. */
+/** Edit an open task (spec §10, §64). Rendered keyed so state inits from props. */
 export function TaskDetailSheet({
   task,
   onClose,
@@ -37,46 +39,45 @@ export function TaskDetailSheet({
     task.category_id,
   );
   const [urgent, setUrgent] = React.useState(task.urgent);
-  const [due, setDue] = React.useState(
-    task.due_date ? task.due_date.slice(0, 10) : "",
-  );
   const [assignedTo, setAssignedTo] = React.useState<string | null>(
     task.assigned_to,
   );
-  const [recurrenceKey, setRecurrenceKey] = React.useState(
-    presetKeyForRule(task.recurrence_rule),
-  );
+  const [schedule, setSchedule] = React.useState<ScheduleValue>({
+    // due_date is stored as noon UTC, so the date portion is the calendar day.
+    dueDate: task.due_date ? task.due_date.slice(0, 10) : null,
+    recurrence: normalizeRule(task.recurrence_rule),
+    recurrenceEndDate: task.recurrence_end_date,
+  });
   const [notes, setNotes] = React.useState(task.notes ?? "");
   const [saving, setSaving] = React.useState(false);
 
   async function save() {
     if (!title.trim()) return;
     setSaving(true);
-    const rule: RecurrenceRule | null =
-      RECURRENCE_PRESETS.find((p) => p.key === recurrenceKey)?.rule ?? null;
-    const patch = {
+    const res = await updateTask(task.id, {
       title: title.trim(),
       categoryId,
       urgent,
-      dueDate: due ? new Date(due).toISOString() : null,
+      dueDate: schedule.dueDate,
       assignedTo,
-      recurrence: rule,
+      recurrence: schedule.recurrence,
+      recurrenceEndDate: schedule.recurrenceEndDate,
       notes: notes || null,
-    };
-    const res = await updateTask(task.id, patch);
+    });
     setSaving(false);
     if (!res.ok) {
       toast({ message: res.message ?? "Couldn't update." });
       return;
     }
     onChanged({
-      title: patch.title,
+      title: title.trim(),
       category_id: categoryId,
       urgent,
-      due_date: patch.dueDate,
+      due_date: schedule.dueDate ? dateStrToDueISO(schedule.dueDate) : null,
       assigned_to: assignedTo,
-      recurrence_rule: rule,
-      notes: patch.notes,
+      recurrence_rule: schedule.recurrence,
+      recurrence_end_date: schedule.recurrenceEndDate,
+      notes: notes || null,
     });
     onClose();
     router.refresh();
@@ -125,15 +126,11 @@ export function TaskDetailSheet({
           </div>
         </div>
 
-        <div>
-          <Label htmlFor="tdue">Due date</Label>
-          <Input
-            id="tdue"
-            type="date"
-            value={due}
-            onChange={(e) => setDue(e.target.value)}
-          />
-        </div>
+        <TaskScheduleFields
+          value={schedule}
+          onChange={setSchedule}
+          showEndDate
+        />
 
         {members.length > 0 && (
           <div>
@@ -153,21 +150,6 @@ export function TaskDetailSheet({
             </div>
           </div>
         )}
-
-        <div>
-          <Label>Repeat</Label>
-          <div className="flex gap-2 overflow-x-auto no-scrollbar -mx-1 px-1 pb-1">
-            {RECURRENCE_PRESETS.map((p) => (
-              <Chip
-                key={p.key}
-                active={recurrenceKey === p.key}
-                onClick={() => setRecurrenceKey(p.key)}
-              >
-                {p.label}
-              </Chip>
-            ))}
-          </div>
-        </div>
 
         <div>
           <Label htmlFor="tnotes2">Notes</Label>

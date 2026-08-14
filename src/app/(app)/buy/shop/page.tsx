@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { requireHousehold } from "@/lib/auth/household";
 import { createClient } from "@/lib/supabase/server";
 import { ShoppingMode } from "@/components/shopping/shopping-mode";
+import { resolveShoppingImageUrls } from "@/lib/data/shopping-images";
 import type { ShoppingItem, Store } from "@/types/db";
 
 export const metadata: Metadata = { title: "Shopping" };
@@ -25,10 +26,14 @@ export default async function ShopModePage() {
       .order("created_at", { ascending: true }),
   ]);
 
+  const itemList = (items as ShoppingItem[]) ?? [];
+  const imageUrls = await resolveShoppingImageUrls(supabase, itemList);
+
   return (
     <ShoppingMode
-      initialItems={(items as ShoppingItem[]) ?? []}
+      initialItems={itemList}
       stores={(stores as Store[]) ?? []}
+      imageUrls={imageUrls}
     />
   );
 }

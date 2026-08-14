@@ -7,6 +7,7 @@ import { useToast } from "@/components/ui/toast";
 import { SectionTitle } from "@/components/ui/primitives";
 import { PurchaseSheet } from "@/components/shopping/purchase-sheet";
 import { EditItemSheet } from "@/components/shopping/edit-item-sheet";
+import { ImageThumb } from "@/components/shopping/image-thumb";
 import { completeShoppingItem, undoShoppingPurchase } from "@/actions/shopping";
 import { groupShopping } from "@/lib/shopping-group";
 import type { ShoppingItem, Store } from "@/types/db";
@@ -16,10 +17,12 @@ export function ShoppingBoard({
   initialItems,
   stores,
   currency,
+  imageUrls = {},
 }: {
   initialItems: ShoppingItem[];
   stores: Store[];
   currency: string;
+  imageUrls?: Record<string, string>;
 }) {
   const router = useRouter();
   const { toast } = useToast();
@@ -82,6 +85,7 @@ export function ShoppingBoard({
           </SectionTitle>
           <ItemList
             items={grouped.urgent}
+            imageUrls={imageUrls}
             onComplete={complete}
             onEdit={setEditing}
           />
@@ -98,6 +102,7 @@ export function ShoppingBoard({
           </SectionTitle>
           <ItemList
             items={group.items}
+            imageUrls={imageUrls}
             onComplete={complete}
             onEdit={setEditing}
           />
@@ -111,6 +116,7 @@ export function ShoppingBoard({
           onClose={() => setEditing(null)}
           item={editing}
           stores={stores}
+          imageUrl={imageUrls[editing.id] ?? null}
           onChanged={(patch) =>
             setItems((prev) =>
               prev.map((i) => (i.id === editing.id ? { ...i, ...patch } : i)),
@@ -139,10 +145,12 @@ export function ShoppingBoard({
 
 function ItemList({
   items,
+  imageUrls,
   onComplete,
   onEdit,
 }: {
   items: ShoppingItem[];
+  imageUrls: Record<string, string>;
   onComplete: (i: ShoppingItem) => void;
   onEdit: (i: ShoppingItem) => void;
 }) {
@@ -152,6 +160,7 @@ function ItemList({
         <ShoppingRow
           key={item.id}
           item={item}
+          imageUrl={imageUrls[item.id] ?? null}
           onComplete={() => onComplete(item)}
           onEdit={() => onEdit(item)}
         />
@@ -162,10 +171,12 @@ function ItemList({
 
 export function ShoppingRow({
   item,
+  imageUrl,
   onComplete,
   onEdit,
 }: {
   item: ShoppingItem;
+  imageUrl?: string | null;
   onComplete: () => void;
   onEdit: () => void;
 }) {
@@ -206,6 +217,9 @@ export function ShoppingRow({
           </svg>
         )}
       </button>
+      {imageUrl && (
+        <ImageThumb url={imageUrl} alt={item.name} className="h-12 w-12" />
+      )}
       <button
         onClick={onEdit}
         className="flex-1 text-left py-2 min-w-0"

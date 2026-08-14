@@ -1,69 +1,66 @@
 import { describe, it, expect } from "vitest";
 import {
-  nextOccurrence,
+  normalizeRule,
   recurrenceLabel,
   presetKeyForRule,
+  ruleForPreset,
 } from "@/lib/recurrence/recurrence";
 
-describe("nextOccurrence", () => {
-  it("daily adds interval days", () => {
-    const from = new Date("2026-08-12T09:00:00Z");
-    const next = nextOccurrence({ freq: "daily", interval: 3 }, from);
-    expect(next.toISOString().slice(0, 10)).toBe("2026-08-15");
+describe("normalizeRule", () => {
+  it("accepts the current shape", () => {
+    expect(
+      normalizeRule({ frequency: "weekly", interval: 1, days_of_week: [6] }),
+    ).toEqual({ frequency: "weekly", interval: 1, days_of_week: [6] });
   });
 
-  it("weekly adds interval weeks", () => {
-    const from = new Date("2026-08-12T09:00:00Z");
-    const next = nextOccurrence({ freq: "weekly", interval: 2 }, from);
-    expect(next.toISOString().slice(0, 10)).toBe("2026-08-26");
+  it("migrates the legacy {freq, weekday} shape", () => {
+    expect(normalizeRule({ freq: "weekly", interval: 2, weekday: 2 })).toEqual({
+      frequency: "weekly",
+      interval: 2,
+      days_of_week: [2],
+    });
   });
 
-  it("monthly clamps to end of shorter months", () => {
-    const from = new Date("2026-01-31T09:00:00Z");
-    const next = nextOccurrence({ freq: "monthly", interval: 1 }, from);
-    // February has 28 days in 2026
-    expect(next.getMonth()).toBe(1); // February
-    expect(next.getDate()).toBeLessThanOrEqual(28);
+  it("returns null for junk", () => {
+    expect(normalizeRule(null)).toBeNull();
+    expect(normalizeRule({ frequency: "yearly" })).toBeNull();
   });
 
-  it("weekly with weekday lands on the next matching weekday", () => {
-    // 2026-08-12 is a Wednesday; next Saturday (6) is 2026-08-15
-    const from = new Date("2026-08-12T09:00:00");
-    const next = nextOccurrence(
-      { freq: "weekly", interval: 1, weekday: 6 },
-      from,
-    );
-    expect(next.getDay()).toBe(6);
-  });
-
-  it("never returns a date before `from`", () => {
-    const from = new Date("2026-08-12T09:00:00Z");
-    for (const rule of [
-      { freq: "daily" as const, interval: 1 },
-      { freq: "weekly" as const, interval: 1 },
-      { freq: "monthly" as const, interval: 1 },
-    ]) {
-      expect(nextOccurrence(rule, from).getTime()).toBeGreaterThan(
-        from.getTime(),
-      );
-    }
+  it("drops days_of_week for non-weekly", () => {
+    expect(normalizeRule({ frequency: "daily", interval: 7 })).toEqual({
+      frequency: "daily",
+      interval: 7,
+    });
   });
 });
 
-describe("recurrenceLabel / presetKeyForRule", () => {
-  it("labels common rules", () => {
-    expect(recurrenceLabel({ freq: "weekly", interval: 1 })).toBe("Every week");
-    expect(recurrenceLabel({ freq: "weekly", interval: 2 })).toBe(
+describe("recurrenceLabel", () => {
+  it("labels weekly with a weekday", () => {
+    expect(
+      recurrenceLabel({ frequency: "weekly", interval: 1, days_of_week: [6] }),
+    ).toBe("Every Saturday");
+  });
+  it("labels every-N", () => {
+    expect(recurrenceLabel({ frequency: "weekly", interval: 2 })).toBe(
       "Every 2 weeks",
     );
-    expect(recurrenceLabel(null)).toBe("");
-  });
-
-  it("round-trips preset keys", () => {
-    expect(presetKeyForRule({ freq: "monthly", interval: 1 })).toBe("monthly");
-    expect(presetKeyForRule({ freq: "weekly", interval: 2 })).toBe(
-      "fortnightly",
+    expect(recurrenceLabel({ frequency: "daily", interval: 7 })).toBe(
+      "Every 7 days",
     );
+    expect(recurrenceLabel({ frequency: "monthly", interval: 3 })).toBe(
+      "Every 3 months",
+    );
+  });
+});
+
+describe("presets", () => {
+  it("round-trips preset keys", () => {
+    expect(presetKeyForRule(ruleForPreset("weekly"))).toBe("weekly");
+    expect(presetKeyForRule(ruleForPreset("fortnightly"))).toBe("fortnightly");
+    expect(presetKeyForRule(ruleForPreset("monthly"))).toBe("monthly");
     expect(presetKeyForRule(null)).toBe("none");
+    expect(presetKeyForRule({ frequency: "monthly", interval: 3 })).toBe(
+      "custom",
+    );
   });
 });

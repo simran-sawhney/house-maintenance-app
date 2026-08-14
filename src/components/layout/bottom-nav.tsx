@@ -2,7 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, ShoppingCart, CheckSquare, Wrench, Plus } from "lucide-react";
+import {
+  Home,
+  ShoppingCart,
+  CheckSquare,
+  CalendarDays,
+  Wrench,
+  Plus,
+} from "lucide-react";
 import { useQuickAdd } from "@/components/quick-add/quick-add-context";
 import { cn } from "@/lib/utils";
 
@@ -10,6 +17,7 @@ const ITEMS = [
   { href: "/", label: "Home", icon: Home, exact: true },
   { href: "/buy", label: "Buy", icon: ShoppingCart },
   { href: "/tasks", label: "Tasks", icon: CheckSquare },
+  { href: "/calendar", label: "Calendar", icon: CalendarDays },
   { href: "/house", label: "House", icon: Wrench },
 ];
 
@@ -18,15 +26,17 @@ export function BottomNav() {
   const { openQuickAdd } = useQuickAdd();
 
   const isActive = (href: string, exact?: boolean) =>
-    exact ? pathname === href : pathname === href || pathname.startsWith(href + "/");
+    exact
+      ? pathname === href
+      : pathname === href || pathname.startsWith(href + "/");
 
   return (
     <>
-      {/* Floating quick-add button */}
+      {/* Floating quick-add button (bottom-right, clear of the nav row) */}
       <button
         onClick={() => openQuickAdd()}
         aria-label="Quick add"
-        className="fixed left-1/2 -translate-x-1/2 bottom-[calc(env(safe-area-inset-bottom)+1.15rem)] z-40 h-14 w-14 rounded-full bg-primary text-primary-foreground shadow-lg flex items-center justify-center active:scale-95 transition"
+        className="fixed right-4 bottom-[calc(env(safe-area-inset-bottom)+4.75rem)] z-40 h-14 w-14 rounded-full bg-primary text-primary-foreground shadow-lg flex items-center justify-center active:scale-95 transition"
       >
         <Plus className="h-7 w-7" />
       </button>
@@ -36,11 +46,13 @@ export function BottomNav() {
         aria-label="Primary"
       >
         <div className="mx-auto max-w-md grid grid-cols-5 h-[4.25rem] items-center">
-          <NavLink item={ITEMS[0]} active={isActive(ITEMS[0].href, true)} />
-          <NavLink item={ITEMS[1]} active={isActive(ITEMS[1].href)} />
-          <div aria-hidden />
-          <NavLink item={ITEMS[2]} active={isActive(ITEMS[2].href)} />
-          <NavLink item={ITEMS[3]} active={isActive(ITEMS[3].href)} />
+          {ITEMS.map((item) => (
+            <NavLink
+              key={item.href}
+              item={item}
+              active={isActive(item.href, item.exact)}
+            />
+          ))}
         </div>
       </nav>
     </>

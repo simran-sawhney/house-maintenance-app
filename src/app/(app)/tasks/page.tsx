@@ -5,32 +5,25 @@ import { requireHousehold } from "@/lib/auth/household";
 import { createClient } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/layout/page-header";
 import { TasksBoard } from "@/components/tasks/tasks-board";
-import { groupTasks } from "@/lib/task-group";
-import type { Task } from "@/types/db";
+import { getOpenTaskViews } from "@/lib/data/tasks-view";
+import { todayStr } from "@/lib/dates";
 
 export const metadata: Metadata = { title: "Tasks" };
 
 export default async function TasksPage() {
-  const { household } = await requireHousehold();
+  const { household, user } = await requireHousehold();
   const supabase = await createClient();
 
-  const { data } = await supabase
-    .from("tasks")
-    .select("*")
-    .eq("household_id", household.id)
-    .eq("status", "open")
-    .order("created_at", { ascending: true });
-
-  const tasks = (data as Task[]) ?? [];
-  const { urgent } = groupTasks(tasks);
+  const views = await getOpenTaskViews(supabase, household.id, household.timezone);
+  const urgentCount = views.filter((v) => v.task.urgent || v.overdue).length;
 
   return (
     <div>
       <PageHeader
         title="Tasks"
         subtitle={
-          tasks.length > 0
-            ? `${tasks.length} open${urgent.length ? ` · ${urgent.length} urgent` : ""}`
+          views.length > 0
+            ? `${views.length} open${urgentCount ? ` · ${urgentCount} urgent` : ""}`
             : "Shared household jobs"
         }
         right={
@@ -44,7 +37,12 @@ export default async function TasksPage() {
         }
       />
       <div className="px-4">
-        <TasksBoard initialTasks={tasks} timezone={household.timezone} />
+        <TasksBoard
+          initialViews={views}
+          today={todayStr(household.timezone)}
+          currentUserId={user.id}
+          timezone={household.timezone}
+        />
       </div>
     </div>
   );

@@ -55,6 +55,7 @@ export default async function AppLayout({
 
   return (
     <AppChrome
+      householdId={ctx.household.id}
       stores={(stores as Store[]) ?? []}
       categories={(categories as TaskCategory[]) ?? []}
       members={members}

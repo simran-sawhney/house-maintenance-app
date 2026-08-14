@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { ChevronLeft, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toast";
+import { ImageThumb } from "@/components/shopping/image-thumb";
 import { completeShoppingItem, undoShoppingPurchase } from "@/actions/shopping";
 import { groupShopping } from "@/lib/shopping-group";
 import type { ShoppingItem, Store } from "@/types/db";
@@ -18,9 +19,11 @@ import { cn } from "@/lib/utils";
 export function ShoppingMode({
   initialItems,
   stores,
+  imageUrls = {},
 }: {
   initialItems: ShoppingItem[];
   stores: Store[];
+  imageUrls?: Record<string, string>;
 }) {
   const router = useRouter();
   const { toast } = useToast();
@@ -134,6 +137,13 @@ export function ShoppingMode({
                   className="w-full flex items-center gap-4 rounded-xl border border-border bg-surface px-4 py-4 text-left active:bg-surface-2"
                 >
                   <span className="shrink-0 h-8 w-8 rounded-full border-2 border-border-strong" />
+                  {imageUrls[item.id] && (
+                    <ImageThumb
+                      url={imageUrls[item.id]}
+                      alt={item.name}
+                      className="h-16 w-16"
+                    />
+                  )}
                   <span className="text-lg font-medium flex-1">
                     {item.name}
                     {item.quantity != null && (

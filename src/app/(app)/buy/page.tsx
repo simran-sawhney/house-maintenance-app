@@ -4,6 +4,7 @@ import { History } from "lucide-react";
 import { requireHousehold } from "@/lib/auth/household";
 import { createClient } from "@/lib/supabase/server";
 import { getShoppingBoard } from "@/lib/data/shopping";
+import { resolveShoppingImageUrls } from "@/lib/data/shopping-images";
 import { PageHeader } from "@/components/layout/page-header";
 import { StoreShortcuts } from "@/components/shopping/store-shortcuts";
 import { ShoppingBoard } from "@/components/shopping/shopping-board";
@@ -24,6 +25,7 @@ export default async function BuyPage() {
 
   const storeList = (stores as Store[]) ?? [];
   const board = await getShoppingBoard(supabase, household.id, storeList);
+  const imageUrls = await resolveShoppingImageUrls(supabase, board.items);
 
   return (
     <div>
@@ -50,6 +52,7 @@ export default async function BuyPage() {
           initialItems={board.items}
           stores={storeList}
           currency={household.currency_code}
+          imageUrls={imageUrls}
         />
       </div>
     </div>
