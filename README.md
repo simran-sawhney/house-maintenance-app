@@ -19,8 +19,12 @@ Supabase free tiers.
   suggestions from your own history **plus a built-in grocery catalogue**
   (`src/lib/grocery/catalog.ts`) so suggestions work from day one — edit that
   file to tune the list; no database or deploy of data needed.
-- **History** — reachable from the two cards on the Home screen, or the clock
-  icon on Buy / Tasks. Purchases and completed tasks, each with dates.
+- **History search** — Purchases and Completed tasks each have an instant
+  search (debounced, server-side, trigram-indexed) plus filters (store / date
+  range / person for purchases; category / person / date / one-off-vs-recurring
+  for tasks), sorting, date grouping, and "Load more" pagination. Completed
+  **recurring occurrences** are searchable individually. Reachable from the Home
+  cards or the clock icon on Buy / Tasks; search/filters are reflected in the URL.
 - **Buy** — one shared list grouped by store, urgent first. Tap to purchase
   (saved to history), optional price sheet, Undo. Distraction-free **Shopping
   mode**.
@@ -97,6 +101,7 @@ key is required**.
    - `0004_calendar_recurrence_images.sql` — task occurrences, calendar/recurrence
      fields, product/shopping image columns
    - `0005_storage.sql` — private `shopping-images` Storage bucket + policies
+   - `0006_history_search.sql` — trigram search indexes + `completed_task_history` view
 
    **Option A — SQL editor:** paste each file's contents and run, in order.
 

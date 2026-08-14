@@ -48,6 +48,7 @@ export async function searchHousehold(
       shoppingRes,
       purchasesRes,
       tasksRes,
+      completedRes,
       itemsRes,
       logsRes,
       notesRes,
@@ -72,9 +73,18 @@ export async function searchHousehold(
         .select("*")
         .eq("household_id", hid)
         .ilike("title", like)
-        .neq("status", "cancelled")
+        .eq("status", "open")
         .order("created_at", { ascending: false })
-        .limit(8),
+        .limit(6),
+      // Completed history: one-off completed tasks + completed recurring
+      // occurrences (spec §9, §11).
+      supabase
+        .from("completed_task_history")
+        .select("task_id, title, occurrence_date, completed_at, recurring")
+        .eq("household_id", hid)
+        .ilike("title", like)
+        .order("completed_at", { ascending: false })
+        .limit(6),
       supabase
         .from("maintenance_items")
         .select("*")
@@ -136,21 +146,30 @@ export async function searchHousehold(
       });
     }
 
-    const tasks = (tasksRes.data as Task[]) ?? [];
-    if (tasks.length) {
-      sections.push({
-        key: "tasks",
-        label: "Tasks",
-        items: tasks.map((t) => ({
-          id: t.id,
-          title: t.title,
-          subtitle:
-            t.status === "completed"
-              ? `completed ${formatFriendlyDate(t.completed_at, tz)}`
-              : "open",
-          href: t.status === "completed" ? "/history?tab=tasks" : "/tasks",
-        })),
-      });
+    const openTasks = (tasksRes.data as Task[]) ?? [];
+    const completed =
+      (completedRes.data as {
+        task_id: string;
+        title: string;
+        occurrence_date: string | null;
+        completed_at: string | null;
+      }[]) ?? [];
+    const taskItems: SearchResultItem[] = [
+      ...openTasks.map((t) => ({
+        id: `open:${t.id}`,
+        title: t.title,
+        subtitle: "open",
+        href: "/tasks",
+      })),
+      ...completed.map((c) => ({
+        id: `done:${c.task_id}:${c.occurrence_date ?? "one"}`,
+        title: c.title,
+        subtitle: `completed ${formatFriendlyDate(c.occurrence_date ?? c.completed_at, tz)}`,
+        href: "/history?tab=tasks",
+      })),
+    ].slice(0, 10);
+    if (taskItems.length) {
+      sections.push({ key: "tasks", label: "Tasks", items: taskItems });
     }
 
     const items = (itemsRes.data as MaintenanceItem[]) ?? [];
