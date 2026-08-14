@@ -38,12 +38,17 @@ export async function updateDisplayName(name: string): Promise<SimpleResult> {
   try {
     const { user } = await requireHousehold();
     const supabase = await createClient();
+    // Upsert so it works even if a profile row doesn't exist yet (e.g. members
+    // added directly, who never ran onboarding).
     const { error } = await supabase
       .from("profiles")
-      .update({ display_name: name.trim() || null })
-      .eq("id", user.id);
+      .upsert(
+        { id: user.id, display_name: name.trim() || null },
+        { onConflict: "id" },
+      );
     if (error) return { ok: false, message: "Couldn't save. Try again." };
     revalidatePath("/settings");
+    revalidatePath("/");
     return { ok: true };
   } catch {
     return { ok: false, message: "Couldn't save. Try again." };
